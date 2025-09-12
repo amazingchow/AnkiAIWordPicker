@@ -1,0 +1,91 @@
+<!doctype html>
+<html>
+    <head>
+        <title>Word Collector</title>
+        <meta charset="UTF-8" />
+        <style>
+            body {
+                font-family: sans-serif;
+                width: 350px;
+                padding: 10px;
+            }
+            h1 {
+                font-size: 18px;
+                margin-top: 0;
+            }
+            #word-list {
+                list-style-type: none;
+                padding: 0;
+                margin: 0;
+                max-height: 300px;
+                overflow-y: auto;
+                border: 1px solid #ccc;
+                border-radius: 4px;
+            }
+            #word-list li {
+                padding: 8px 12px;
+                border-bottom: 1px solid #eee;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            #word-list li:last-child {
+                border-bottom: none;
+            }
+            button {
+                width: 100%;
+                padding: 10px;
+                margin-top: 10px;
+                background-color: #4285f4;
+                color: white;
+                border: none;
+                border-radius: 4px;
+                cursor: pointer;
+                font-size: 14px;
+            }
+            button:hover {
+                background-color: #357ae8;
+            }
+            button:disabled {
+                background-color: #ccc;
+                cursor: not-allowed;
+            }
+            #status {
+                margin-top: 5px;
+                font-size: 12px;
+                color: #555;
+            }
+            .pagination {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin: 10px 0;
+                font-size: 12px;
+            }
+            .pagination button {
+                width: auto;
+                padding: 5px 10px;
+                margin: 0 5px;
+                font-size: 12px;
+            }
+            .pagination-info {
+                color: #555;
+            }
+        </style>
+    </head>
+    <body>
+        <h1>Saved Words & Phrases</h1>
+        <div id="status">Loading...</div>
+        <ul id="word-list"></ul>
+
+        <div class="pagination">
+            <button id="prev-btn" disabled>Prev</button>
+            <span class="pagination-info" id="page-info">Page 1 of 1</span>
+            <button id="next-btn" disabled>Next</button>
+        </div>
+
+        <button id="download-btn">Download as .txt</button>
+
+        <script src="popup.js"></script>
+    </body>
+</html>
