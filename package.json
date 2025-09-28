@@ -4,7 +4,7 @@
     "description": "A Chrome extension that collects English words and phrases from web pages.",
     "main": "popup.js",
     "scripts": {
-        "format": "prettier --write \"**/*.{js,html,css,md}\""
+        "lint": "prettier --write ."
     },
     "devDependencies": {
         "prettier": "3.6.2"

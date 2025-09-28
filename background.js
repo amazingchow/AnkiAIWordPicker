@@ -1,78 +1,74 @@
-// 这个脚本在后台持续运行，负责管理 IndexedDB 数据库的创建、读取和写入。
+// 这个脚本在后台持续运行，它负责处理事件、管理插件状态、与服务器通信等。在Manifest V3（当前最新标准）中，它以 Service Worker 的形式存在，是事件驱动的，不会一直占用资源。
+// 它的任务是管理单词数据的存储和读取。
+console.log("[AnkiAIWordPicker] background.js loaded successfully.");
 
-console.log("'AnkiAIWordPicker' - Background script loaded successfully.");
+const STORAGE_KEY = "AnkiAIWordPicker";
+const CONFIG_KEYS = {
+    OPENAI_BASE_URL: "openai_base_url",
+    OPENAI_API_KEY: "openai_api_key"
+};
 
-const DB_NAME = "WordCollectorDB";
-const STORE_NAME = "words";
-let db;
-
-// 初始化数据库
-function initDB() {
-    const request = indexedDB.open(DB_NAME, 1);
-
-    request.onsuccess = (event) => {
-        db = event.target.result;
-        console.log("'AnkiAIWordPicker' - Database opened successfully.");
-    };
-
-    request.onupgradeneeded = (event) => {
-        const db = event.target.result;
-        // 创建一个名为 'words' 的对象存储空间（类似数据库的表）
-        // 使用 'text' 字段作为主键，确保不会重复保存相同的文本
-        const objectStore = db.createObjectStore(STORE_NAME, { keyPath: "text" });
-        // 为 'timestamp' 字段创建索引，方便未来按时间排序
-        objectStore.createIndex("timestamp", "timestamp", { unique: false });
-        console.log("'AnkiAIWordPicker' - Database upgrade complete.");
-    };
-
-    request.onerror = (event) => {
-        console.error("'AnkiAIWordPicker' - Database error:", event.target.errorCode);
-    };
-}
-
-// 添加文本到数据库
-function addTextToDB(text) {
-    if (!db) {
-        console.error("'AnkiAIWordPicker' - Database is not initialized.");
-        return;
-    }
-
-    // 创建一个读写事务
-    const transaction = db.transaction([STORE_NAME], "readwrite");
-    const objectStore = transaction.objectStore(STORE_NAME);
-
-    const record = {
-        text: text,
-        timestamp: new Date().toISOString(),
-    };
-
-    // 添加记录
-    const request = objectStore.add(record);
-
-    request.onsuccess = () => {
-        console.log("'AnkiAIWordPicker' - Text added to DB:", record);
-    };
-
-    request.onerror = (event) => {
-        // 如果文本已存在（因为text是主键），这里会报错，这正好可以防止重复
-        if (event.target.error.name === "ConstraintError") {
-            console.log("'AnkiAIWordPicker' - Text already exists in DB, not adding again.");
-        } else {
-            console.error("'AnkiAIWordPicker' - Error adding text to DB:", event.target.error);
+// 添加文本到存储
+async function addTextToStorage(text) {
+    try {
+        // 获取现有数据
+        const result = await chrome.storage.local.get(STORAGE_KEY);
+        
+        const words = result[STORAGE_KEY] || [];
+        // 检查是否已存在
+        if (words.some((word) => word.text === text)) {
+            console.log("[AnkiAIWordPicker] Text already exists in storage, not adding again.");
+            return false;
         }
-    };
+
+        // 添加新记录
+        const record = {
+            text: text,
+            timestamp: new Date().toISOString(),
+        };
+        words.push(record);
+
+        // 保存更新后的数据
+        await chrome.storage.local.set({ [STORAGE_KEY]: words });
+        console.log("[AnkiAIWordPicker] Text added to storage:", record);
+        return true;
+    } catch (error) {
+        console.error("[AnkiAIWordPicker] Error adding text to storage:", error);
+        return false;
+    }
 }
 
-// 监听来自 content.js 的消息
-chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
-    if (message.type === "WORD_COLLECTOR_EXTENSION_SAVE_TEXT") {
-        addTextToDB(message.data);
-        // 发送响应以确认消息已处理
-        sendResponse({ success: true, message: "Text saved successfully" });
-    }
-    // 返回 true 表示我们将异步发送响应
-    return true;
-});
 
-// 插件安装或启动时初始化数据库
-initDB();
+// 获取配置
+async function getConfig() {
+    try {
+        const result = await chrome.storage.sync.get(Object.values(CONFIG_KEYS));
+        return {
+            [CONFIG_KEYS.OPENAI_BASE_URL]: result[CONFIG_KEYS.OPENAI_BASE_URL] || "https://api.openai.com/v1",
+            [CONFIG_KEYS.OPENAI_API_KEY]: result[CONFIG_KEYS.OPENAI_API_KEY] || ""
+        };
+    } catch (error) {
+        console.error("[AnkiAIWordPicker] Error getting config:", error);
+        return {
+            [CONFIG_KEYS.OPENAI_BASE_URL]: "https://api.openai.com/v1",
+            [CONFIG_KEYS.OPENAI_API_KEY]: ""
+        };
+    }
+}
+
+// 监听来自 content.js 和 options.js 的消息
+chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    if (message.type === "ANKI_AI_WORD_PICKER_EXT_SAVE_TEXT") {
+        addTextToStorage(message.data).then((success) => {
+            sendResponse({ success, message: success ? "Text saved successfully" : "Failed to save text" });
+        });
+        // 返回 true 表示我们将异步发送响应
+        return true;
+    } else if (message.type === "GET_CONFIG") {
+        getConfig().then(config => {
+            sendResponse({ success: true, config });
+        });
+        // 返回 true 表示我们将异步发送响应
+        return true;
+    }
+});
